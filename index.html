@@ -12,13 +12,7 @@
 
 <body>
     <div id="app" class="w3border">
-        <input type='file' ref='file' v-show='false' webkitdirectory />
-        <div class="w3button w3black" @click="load">Load</div>
-
-        <div v-if="isLoading">處理中...</div>
-        <div v-if="errorMessage" style="color: red;">{{ errorMessage }}</div>
-
-        <div v-for="(charData, name) in imageUrls" :key="name" class="character-card">
+        <div v-for="(charData, name) in structuredImages" :key="name" class="character-card">
             <div class="w3bar">
                 <h1 class='w3bar-item'> {{ name }} </h1>
                 <div class="w3button w3black w3bar-item" @click="charData.isShow=true" v-show="!charData.isShow">Open
@@ -44,153 +38,85 @@
             <hr>
         </div>
     </div>
-    
+
 
     <script>
         new Vue({
             el: '#app',
             data: {
-                // 原始 File 物件 (保留，但不是主要渲染資料)
-                classifiedImages: {},
-
-                // 結構化後的 URL 變數，用於渲染
-                imageUrls: {},
-
+                structuredImages: {},
                 isLoading: false,
                 errorMessage: null,
+                // 圖片根目錄，基於 GitHub Pages 的相對路徑
+                BASE_IMAGE_PATH: '角色/',
+                // JSON 索引檔案的路徑
+                METADATA_URL: '角色.json'
             },
             methods: {
-                load: function () {
-                    // 由於採用箭頭函式，這裡的 this 始終指向 Vue 實例
-                    this.isLoading = true;
-                    this.errorMessage = null;
-                    this.revokeAllUrls(); // 釋放舊資源
-
-                    if (!this.$refs.file) {
-                        this.errorMessage = "找不到 $refs.file 元素，請確認 HTML 綁定。";
-                        this.isLoading = false;
-                        return;
-                    }
-
-                    // 關鍵：清除 value，確保連續選擇同一個資料夾也能觸發 change 事件
-                    this.$refs.file.value = null;
-
-                    // 使用箭頭函式來確保 this 綁定到 Vue 實例
-                    this.$refs.file.onchange = (e) => {
-                        this.handleFileChange(e);
+                /**
+                 * 根據檔名 (filename) 將圖片分類到結構化的物件中。
+                 */
+                classifyAndStructure: function (charName) {
+                    const charStructure = {
+                        main: null,
+                        baseSkills: [],
+                        uniqueSkills: [],
+                        isShow: false
                     };
 
-                    this.$refs.file.click();
+                    const fullPath = this.BASE_IMAGE_PATH + charName + '/';
+                    charStructure.main = { url: fullPath + 'main.png', name: 'main.png' };
+                    charStructure.baseSkills.push({ url: fullPath + 'skill_base_01.png', name: 'skill_base_01.png' });
+                    charStructure.baseSkills.push({ url: fullPath + 'skill_base_02.png', name: 'skill_base_02.png' });
+                    charStructure.baseSkills.push({ url: fullPath + 'skill_base_03.png', name: 'skill_base_03.png' });
+                    charStructure.baseSkills.push({ url: fullPath + 'skill_base_04.png', name: 'skill_base_04.png' });
+                    charStructure.uniqueSkills.push({ url: fullPath + 'skill_unique_01.png', name: 'skill_unique_01.png' });
+                    charStructure.uniqueSkills.push({ url: fullPath + 'skill_unique_02.png', name: 'skill_unique_02.png' });
+                    charStructure.uniqueSkills.push({ url: fullPath + 'skill_unique_03.png', name: 'skill_unique_03.png' });
+                    charStructure.uniqueSkills.push({ url: fullPath + 'skill_unique_04.png', name: 'skill_unique_04.png' });
+
+                    return charStructure;
                 },
 
-                handleFileChange: function (e) {
-                    const files = e.target.files;
-
-                    if (files.length === 0) {
-                        this.isLoading = false;
-                        this.classifiedImages = {};
-                        this.imageUrls = {};
-                        console.log("未選擇任何檔案或取消選擇。");
-                        return;
-                    }
+                /**
+                 * 從 GitHub Pages 載入 metadata.json 檔案。
+                 */
+                loadMetadata: async function () {
+                    this.isLoading = true;
+                    this.errorMessage = null;
+                    this.structuredImages = {};
 
                     try {
-                        // 清空舊資料
-                        this.classifiedImages = {};
-                        this.imageUrls = {};
-
-                        const tempClassification = {};
-
-                        // 1. 遍歷檔案，依角色名稱分類 File 物件
-                        for (const file of files) {
-                            // 檢查是否為圖片，且檔名有 .png 結尾
-                            if (!file.type.startsWith('image/')) continue;
-
-                            const relativePath = file.webkitRelativePath;
-                            const pathParts = relativePath.split('/');
-
-                            // 確保路徑深度正確，並提取角色名稱 (索引 2)
-                            if (pathParts.length >= 4) {
-                                const characterName = pathParts[2];
-
-                                if (characterName) {
-                                    if (!tempClassification[characterName]) {
-                                        // 初始化每個角色的 File 陣列
-                                        this.$set(tempClassification, characterName, []);
-                                    }
-                                    tempClassification[characterName].push(file);
-                                }
-                            }
+                        // 1. 載入 JSON 檔案
+                        const response = await fetch(this.METADATA_URL);
+                        if (!response.ok) {
+                            throw new Error(`無法載入 metadata.json (狀態碼: ${response.status})`);
                         }
-                        this.classifiedImages = tempClassification;
+                        const metadata = await response.json();
 
-                        // 2. *** 關鍵新增：依檔名進一步結構化分類並創建 URL ***
-                        const tempImageUrls = {};
+                        // 2. 遍歷 metadata 並建構圖片結構
+                        const tempImages = {};
+                        metadata.forEach(char => {
+                            const charName = char.name;
+                            const structure = this.classifyAndStructure(charName);
+                            tempImages[charName] = structure;
 
-                        for (const name in this.classifiedImages) {
-                            const fileArray = this.classifiedImages[name];
-
-                            // 初始化結構
-                            tempImageUrls[name] = {
-                                main: null,
-                                baseSkills: [],
-                                uniqueSkills: [],
-                                isShow: false
-                            };
-
-                            fileArray.forEach(file => {
-                                const url = URL.createObjectURL(file);
-                                const data = { url: url, name: file.name, file: file };
-
-                                // 根據檔名進行分類
-                                if (file.name === 'main.png') {
-                                    tempImageUrls[name].main = data;
-                                } else if (file.name.startsWith('skill_base_')) {
-                                    tempImageUrls[name].baseSkills.push(data);
-                                } else if (file.name.startsWith('skill_unique_')) {
-                                    tempImageUrls[name].uniqueSkills.push(data);
-                                }
-                            });
-
-                            // 排序技能圖，確保 skill_base_01, skill_base_02 順序正確
-                            tempImageUrls[name].baseSkills.sort((a, b) => a.name.localeCompare(b.name));
-                            tempImageUrls[name].uniqueSkills.sort((a, b) => a.name.localeCompare(b.name));
-                        }
-
-                        // 賦值給 Vue 響應式變數
-                        this.imageUrls = tempImageUrls;
-
-                        this.isLoading = false;
-                        console.log('圖片結構化分類完成，結果已儲存到 this.imageUrls。');
-
-                    } catch (ex) {
-                        this.isLoading = false;
-                        this.errorMessage = "檔案處理發生錯誤：" + ex.message;
-                        console.error(ex);
-                    }
-                },
-
-                revokeAllUrls: function () {
-                    for (const name in this.imageUrls) {
-                        // 釋放 Main 圖
-                        if (this.imageUrls[name].main) {
-                            URL.revokeObjectURL(this.imageUrls[name].main.url);
-                        }
-                        // 釋放 Base 技能圖
-                        this.imageUrls[name].baseSkills.forEach(item => {
-                            URL.revokeObjectURL(item.url);
                         });
-                        // 釋放 Unique 技能圖
-                        this.imageUrls[name].uniqueSkills.forEach(item => {
-                            URL.revokeObjectURL(item.url);
-                        });
+
+                        this.structuredImages = tempImages;
+                        console.log('圖片資料結構化載入完成。');
+
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                        console.error("載入 Metadata 失敗:", error);
+                    } finally {
+                        this.isLoading = false;
                     }
-                    this.imageUrls = {};
-                    console.log("所有舊的圖片 Object URL 資源已釋放。");
-                },
+                }
             },
-            beforeDestroy: function () {
-                this.revokeAllUrls();
+            mounted: function () {
+                // 在 Vue 實例啟動時，立即載入資料
+                this.loadMetadata();
             }
         });
     </script>
