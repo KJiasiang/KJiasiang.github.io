@@ -13,7 +13,7 @@
 <body>
     <div id="app" >
         <div :key="name" class="w3bar">
-            <div class="w3button w3bar-item" v-for="(charData, index) in structuredImages" @click="clickUnit(index)">
+            <div class="w3button w3bar-item" v-for="(charData, index) in structuredImages" @click="clickUnit(index)" :class="{'w3blue': charData.isShow}">
                 <h3> {{ charData.name }} </h3>
                 <img :src="charData.main.url" :alt="charData.main.name" style="width: auto;height: 100px;">
             </div>
@@ -22,9 +22,6 @@
         <div v-for="(charData, name) in structuredImages" :key="name">
             <table v-show="charData.isShow">
                 <tr>
-                    <td rowspan="2">
-                        <img :src="charData.main.url" :alt="charData.main.name">
-                    </td>
                     <td v-for="(item, index) in charData.baseSkills">
                         <img :key="' base-' + name + index" :src="item.url" :alt="item.name">
                     </td>
