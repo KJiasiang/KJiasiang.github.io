@@ -11,15 +11,15 @@
 </head>
 
 <body>
-    <div id="app" class="w3border">
-        <div v-for="(charData, name) in structuredImages" :key="name" class="character-card">
-            <div class="w3bar">
-                <h1 class='w3bar-item'> {{ name }} </h1>
-                <div class="w3button w3black w3bar-item" @click="charData.isShow=true" v-show="!charData.isShow">Open
-                </div>
-                <div class="w3button w3black w3bar-item" @click="charData.isShow=false" v-show="charData.isShow">Close
-                </div>
+    <div id="app" >
+        <div :key="name" class="w3bar">
+            <div class="w3button w3bar-item" v-for="(charData, index) in structuredImages" @click="clickUnit(index)">
+                <h3> {{ charData.name }} </h3>
+                <img :src="charData.main.url" :alt="charData.main.name" style="width: auto;height: 100px;">
             </div>
+        </div>
+        <hr>
+        <div v-for="(charData, name) in structuredImages" :key="name">
             <table v-show="charData.isShow">
                 <tr>
                     <td rowspan="2">
@@ -35,7 +35,6 @@
                     </td>
                 </tr>
             </table>
-            <hr>
         </div>
     </div>
 
@@ -44,20 +43,25 @@
         new Vue({
             el: '#app',
             data: {
-                structuredImages: {},
-                isLoading: false,
-                errorMessage: null,
-                // 圖片根目錄，基於 GitHub Pages 的相對路徑
+                structuredImages: [],
                 BASE_IMAGE_PATH: '角色/',
-                // JSON 索引檔案的路徑
                 METADATA_URL: '角色.json'
             },
             methods: {
+                clickUnit: function (index) {
+                    var size = this.structuredImages.length;
+                    console.log(size);
+                    for (var i = 0; i < size; i++) {
+                        this.structuredImages[i].isShow = false;
+                    }
+                    this.structuredImages[index].isShow = true;
+                },
                 /**
                  * 根據檔名 (filename) 將圖片分類到結構化的物件中。
                  */
                 classifyAndStructure: function (charName) {
                     const charStructure = {
+                        name: charName,
                         main: null,
                         baseSkills: [],
                         uniqueSkills: [],
@@ -82,10 +86,7 @@
                  * 從 GitHub Pages 載入 metadata.json 檔案。
                  */
                 loadMetadata: async function () {
-                    this.isLoading = true;
-                    this.errorMessage = null;
-                    this.structuredImages = {};
-
+                    this.structuredImages = [];
                     try {
                         // 1. 載入 JSON 檔案
                         const response = await fetch(this.METADATA_URL);
@@ -95,12 +96,11 @@
                         const metadata = await response.json();
 
                         // 2. 遍歷 metadata 並建構圖片結構
-                        const tempImages = {};
+                        const tempImages = [];
                         metadata.forEach(char => {
                             const charName = char.name;
                             const structure = this.classifyAndStructure(charName);
-                            tempImages[charName] = structure;
-
+                            tempImages.push(structure);
                         });
 
                         this.structuredImages = tempImages;
